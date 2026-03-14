@@ -1,0 +1,96 @@
+[workspace]
+resolver = "2"
+members = [
+    "01-foundation/01-ownership-basics",
+    "01-foundation/02-structs-traits",
+    "01-foundation/03-collections-iterators",
+    "01-foundation/04-error-handling",
+    "01-foundation/05-modules-cargo",
+    "01-foundation/06-testing-docs",
+    "02-intermediate/01-generics-lifetimes",
+    "02-intermediate/02-smart-pointers",
+    "02-intermediate/03-closures-functional",
+    "02-intermediate/04-async-basics",
+    "02-intermediate/05-serde",
+    "03-advanced/01-macros",
+    "03-advanced/02-unsafe-ffi",
+    "03-advanced/03-concurrency",
+    "03-advanced/04-performance",
+    "04-graphics-foundation/01-math",
+    "04-graphics-foundation/02-windowing",
+    # "04-graphics-foundation/03-wgpu-basics",  # 需要 GUI 环境，暂时排除
+    "04-graphics-foundation/04-shaders",
+    "04-graphics-foundation/05-rendering-pipeline",
+    "05-web-services/01-axum-basics",
+    "05-web-services/02-http-clients",
+    "05-web-services/03-streaming",
+    "05-web-services/04-database",
+    "05-web-services/05-observability",
+    "06-3d-renderer/01-architecture",
+    "06-3d-renderer/02-resource-loading",
+    "06-3d-renderer/03-camera-input",
+    "06-3d-renderer/04-lighting-materials",
+    "06-3d-renderer/05-advanced-features",
+    "07-ai-gateway/01-architecture",
+    "07-ai-gateway/02-ai-clients",
+    "07-ai-gateway/03-agent-core",
+    "07-ai-gateway/04-tools-plugins",
+    "07-ai-gateway/05-production",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+authors = ["CCRustStudy Contributors"]
+license = "MIT"
+
+[workspace.dependencies]
+# 异步运行时
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+
+# 序列化
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Web 框架
+axum = "0.7"
+tower = { version = "0.4", features = ["util"] }
+tower-http = { version = "0.5", features = ["trace", "cors"] }
+reqwest = { version = "0.12", features = ["json", "stream"] }
+
+# 数学库
+glam = "0.25"
+nalgebra = "0.33"
+
+# 图形
+wgpu = "0.19"
+winit = "0.29"
+bytemuck = { version = "1.14", features = ["derive"] }
+pollster = "0.3"
+
+# 错误处理
+thiserror = "1"
+anyhow = "1"
+
+# 日志和追踪
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+env_logger = "0.11"
+
+# 时间
+chrono = "0.4"
+
+# 其他
+futures = "0.3"
+tokio-stream = "0.1"
+uuid = { version = "1", features = ["v4", "serde"] }
+criterion = "0.5"
+
+[profile.dev]
+opt-level = 1  # 开发时稍微优化，加快编译速度
+
+[profile.release]
+lto = true           # 链接时优化
+codegen-units = 1    # 更好的优化
+strip = true         # 移除调试符号
