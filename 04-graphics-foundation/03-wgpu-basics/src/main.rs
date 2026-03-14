@@ -1,7 +1,8 @@
 use wgpu::util::DeviceExt;
 use winit::{
     event::*,
-    event_loop::{ControlFlow, EventLoop},
+    event_loop::EventLoop,
+    keyboard::{KeyCode, PhysicalKey},
     window::{Window, WindowBuilder},
 };
 
@@ -61,8 +62,8 @@ const VERTICES: &[Vertex] = &[
 // 渲染器状态
 // ============================================================================
 
-struct State {
-    surface: wgpu::Surface,
+struct State<'a> {
+    surface: wgpu::Surface<'a>,
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
@@ -70,11 +71,11 @@ struct State {
     render_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
     num_vertices: u32,
-    window: Window,
+    window: &'a Window,
 }
 
-impl State {
-    async fn new(window: Window) -> Self {
+impl<'a> State<'a> {
+    async fn new(window: &'a Window) -> Self {
         let size = window.inner_size();
 
         // 创建 wgpu 实例
@@ -84,7 +85,7 @@ impl State {
         });
 
         // 创建表面
-        let surface = unsafe { instance.create_surface(&window) }.unwrap();
+        let surface = instance.create_surface(window).unwrap();
 
         // 请求适配器
         let adapter = instance
@@ -101,8 +102,8 @@ impl State {
             .request_device(
                 &wgpu::DeviceDescriptor {
                     label: None,
-                    features: wgpu::Features::empty(),
-                    limits: wgpu::Limits::default(),
+                    required_features: wgpu::Features::empty(),
+                    required_limits: wgpu::Limits::default(),
                 },
                 None,
             )
@@ -126,6 +127,7 @@ impl State {
             present_mode: surface_caps.present_modes[0],
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
+            desired_maximum_frame_latency: 2,
         };
         surface.configure(&device, &config);
 
@@ -202,7 +204,7 @@ impl State {
     }
 
     pub fn window(&self) -> &Window {
-        &self.window
+        self.window
     }
 
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
@@ -218,25 +220,20 @@ impl State {
         false
     }
 
-    fn update(&mut self) {
-        // 更新逻辑（当前为空）
-    }
+    fn update(&mut self) {}
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        // 获取当前帧
         let output = self.surface.get_current_texture()?;
         let view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
-        // 创建命令编码器
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("Render Encoder"),
             });
 
-        // 开始渲染通道
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
@@ -263,7 +260,6 @@ impl State {
             render_pass.draw(0..self.num_vertices, 0..1);
         }
 
-        // 提交命令
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
 
@@ -278,56 +274,54 @@ impl State {
 fn main() {
     env_logger::init();
 
-    let event_loop = EventLoop::new();
+    let event_loop = EventLoop::new().unwrap();
     let window = WindowBuilder::new()
         .with_title("wgpu 基础 - 三角形")
-        .with_inner_size(winit::dpi::LogicalSize::new(800, 600))
         .build(&event_loop)
         .unwrap();
 
-    let mut state = pollster::block_on(State::new(window));
+    let mut state = pollster::block_on(State::new(&window));
 
-    event_loop.run(move |event, _, control_flow| match event {
-        Event::WindowEvent {
-            ref event,
-            window_id,
-        } if window_id == state.window().id() => {
-            if !state.input(event) {
-                match event {
-                    WindowEvent::CloseRequested
-                    | WindowEvent::KeyboardInput {
-                        input:
-                            KeyboardInput {
-                                state: ElementState::Pressed,
-                                virtual_keycode: Some(VirtualKeyCode::Escape),
-                                ..
-                            },
-                        ..
-                    } => *control_flow = ControlFlow::Exit,
-                    WindowEvent::Resized(physical_size) => {
-                        state.resize(*physical_size);
+    event_loop
+        .run(move |event, elwt| match event {
+            Event::WindowEvent {
+                ref event,
+                window_id,
+            } if window_id == state.window().id() => {
+                if !state.input(event) {
+                    match event {
+                        WindowEvent::CloseRequested
+                        | WindowEvent::KeyboardInput {
+                            event:
+                                KeyEvent {
+                                    physical_key: PhysicalKey::Code(KeyCode::Escape),
+                                    state: ElementState::Pressed,
+                                    ..
+                                },
+                            ..
+                        } => elwt.exit(),
+                        WindowEvent::Resized(physical_size) => {
+                            state.resize(*physical_size);
+                        }
+                        WindowEvent::RedrawRequested => {
+                            state.update();
+                            match state.render() {
+                                Ok(_) => {}
+                                Err(wgpu::SurfaceError::Lost) => state.resize(state.size),
+                                Err(wgpu::SurfaceError::OutOfMemory) => elwt.exit(),
+                                Err(e) => eprintln!("{:?}", e),
+                            }
+                        }
+                        _ => {}
                     }
-                    WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                        state.resize(**new_inner_size);
-                    }
-                    _ => {}
                 }
             }
-        }
-        Event::RedrawRequested(window_id) if window_id == state.window().id() => {
-            state.update();
-            match state.render() {
-                Ok(_) => {}
-                Err(wgpu::SurfaceError::Lost) => state.resize(state.size),
-                Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
-                Err(e) => eprintln!("{:?}", e),
+            Event::AboutToWait => {
+                state.window().request_redraw();
             }
-        }
-        Event::MainEventsCleared => {
-            state.window().request_redraw();
-        }
-        _ => {}
-    });
+            _ => {}
+        })
+        .unwrap();
 }
 
 // ============================================================================
