@@ -18,7 +18,7 @@ members = [
     "03-advanced/04-performance",
     "04-graphics-foundation/01-math",
     "04-graphics-foundation/02-windowing",
-    # "04-graphics-foundation/03-wgpu-basics",  # 需要 GUI 环境，暂时排除
+    "04-graphics-foundation/03-wgpu-basics",
     "04-graphics-foundation/04-shaders",
     "04-graphics-foundation/05-rendering-pipeline",
     "05-web-services/01-axum-basics",
